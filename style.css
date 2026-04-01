@@ -24,14 +24,18 @@ div.col {
 .board {
     display: flex;
     gap: 40px; /* space BETWEEN columns */
+    scroll-snap-type: x mandatory;
+    overflow-x: auto;
 }
 
 .column {
-    flex: 1;
+    flex: 0 0 100%;
     background: #a7d3ff;
     border-radius: 10px;
     padding: 15px;
     min-height: 400px;
+    max-width: 100%;
+    scroll-snap-align: start;
 }
 
 .task {
@@ -91,4 +95,16 @@ button {
     font-size: 16px;
     margin-top: 10px;
     cursor: pointer;
+}
+
+/* Desktop override */
+@media (min-width: 768px) {
+  .column {
+    flex: 1;
+    max-width: none;
+  }
+
+  .board {
+    overflow-x: visible;
+  }
 }

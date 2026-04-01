@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+
 ////////////////////////////////
 
 function addTask(button) {
@@ -50,6 +51,8 @@ function addTask(button) {
 
   button.parentElement.appendChild(task);
 }
+
+
 // ////////////////////////////////
 let draggedTask = null;
 
@@ -80,3 +83,66 @@ document.querySelectorAll(".add-btn").forEach(btn => {
 });
 
 window.addTask = addTask;
+
+
+// Create task element with delete button
+
+function createTaskElement(text) {
+  const task = document.createElement("div");
+  task.className = "task d-flex justify-content-between align-items-center";
+  task.draggable = true;
+
+  const span = document.createElement("span");
+  span.textContent = text;
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "✕";
+  deleteBtn.className = "btn btn-sm btn-danger";
+
+  deleteBtn.onclick = () => {
+    task.remove();
+
+    // OPTIONAL: delete from Supabase
+    // await supabase.from('tasks').delete().eq('id', taskId);
+  };
+
+  task.appendChild(span);
+  task.appendChild(deleteBtn);
+
+  addDragEvents(task);
+  return task;
+}
+
+window.createTaskElement = createTaskElement;
+
+
+// Modal logic
+
+let currentColumn = null;
+
+document.querySelectorAll(".add-btn").forEach(btn => {
+  btn.addEventListener("click", function () {
+    currentColumn = this.parentElement;
+
+    const modal = new bootstrap.Modal(document.getElementById('taskModal'));
+    modal.show();
+  });
+});
+
+document.getElementById("saveTask").addEventListener("click", async () => {
+  const title = document.getElementById("taskTitle").value;
+
+  if (!title) return;
+
+  const task = createTaskElement(title);
+  currentColumn.appendChild(task);
+
+  // ✅ Save to Supabase
+  await supabase.from('tasks').insert([
+    { title: title, status: currentColumn.dataset.status }
+  ]);
+
+  document.getElementById("taskTitle").value = "";
+
+  bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
+});
