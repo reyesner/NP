@@ -18,3 +18,65 @@ async function loadUsers() {
 }
 
 loadUsers();
+
+document.addEventListener('DOMContentLoaded', () => {
+  const toggler = document.getElementsByClassName('caret');
+  for (let i = 0; i < toggler.length; i++) {
+    toggler[i].addEventListener('click', function () {
+      this.parentElement.querySelector('.nested').classList.toggle('active');
+      this.classList.toggle('caret-down');
+    });
+  }
+});
+
+////////////////////////////////
+
+function addTask(button) {
+  const text = prompt("Enter task:");
+  if (!text) return;
+
+  const task = document.createElement("div");
+  task.className = "task";
+  task.draggable = true;
+  task.textContent = text;
+
+  // Edit on click
+  task.onclick = () => {
+    const newText = prompt("Edit task:", task.textContent);
+    if (newText) task.textContent = newText;
+  };
+
+  addDragEvents(task);
+
+  button.parentElement.appendChild(task);
+}
+// ////////////////////////////////
+let draggedTask = null;
+
+// Add drag behavior to tasks
+function addDragEvents(task) {
+  task.addEventListener("dragstart", () => {
+    draggedTask = task;
+  });
+}
+
+// Allow columns to receive tasks
+document.querySelectorAll(".column").forEach(col => {
+  col.addEventListener("dragover", (e) => {
+    e.preventDefault();
+  });
+
+  col.addEventListener("drop", () => {
+    if (draggedTask) {
+      col.appendChild(draggedTask);
+    }
+  });
+});
+
+document.querySelectorAll(".add-btn").forEach(btn => {
+  btn.addEventListener("click", function () {
+    addTask(this);
+  });
+});
+
+window.addTask = addTask;

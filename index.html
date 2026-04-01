@@ -21,16 +21,36 @@
       >
         <div class="title">Next Play Games</div>
         <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav ms-auto">
-            <li><a href="#" class="nav-link active">Add</a></li>
-            <li><a href="#" class="nav-link active">Edit</a></li>
-            <li><a href="#" class="nav-link active">Delete</a></li>
-            huh
-          </ul>
         </div>
       </nav>
     </section>
-    <section id="DROP_DOWN"><p>Fuk</p></section>
+    <section id="DROP_DOWN">
+        <div class="container-fluid px-5 mt-4"> <!-- ~80px edge spacing -->
+        <div class="board">
+
+        <div class="column" data-status="todo">
+        <h5 class="text-center" id="todo">To Do</h5>
+        <button onclick="addTask(this)">+ Add</button>
+        </div>
+
+        <div class="column" data-status="progress">
+        <h5 class="text-center" id="inprogress">In Progress</h5>
+        <button onclick="addTask(this)">+ Add</button>
+        </div>
+
+        <div class="column" data-status="review">
+        <h5 class="text-center" id="inreview">In Review</h5>
+        <button onclick="addTask(this)">+ Add</button>
+        </div>
+
+        <div class="column" data-status="complete">
+        <h5 class="text-center" id="complete">Complete</h5>
+        <button onclick="addTask(this)">+ Add</button>
+        </div>
+
+        </div>
+        </div>
+    </section>
     <script type="module" src="script.js"></script>
   </body>
 </html>
