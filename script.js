@@ -5,19 +5,29 @@ const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function loadUsers() {
+async function loadTasks() {
   const { data, error } = await supabase
-    .from('users')
+    .from('tasks')
     .select('*');
 
   if (error) {
     console.error(error);
-  } else {
-    console.log(data);
+    return;
   }
+
+  data.forEach(taskData => {
+    const column = document.querySelector(
+      `[data-status="${taskData.status}"]`
+    );
+
+    if (column) {
+      const taskEl = createTaskElement(taskData);
+      column.appendChild(taskEl);
+    }
+  });
 }
 
-loadUsers();
+loadTasks();
 
 document.addEventListener('DOMContentLoaded', () => {
   const toggler = document.getElementsByClassName('caret');
@@ -76,34 +86,32 @@ document.querySelectorAll(".column").forEach(col => {
   });
 });
 
-document.querySelectorAll(".add-btn").forEach(btn => {
-  btn.addEventListener("click", function () {
-    addTask(this);
-  });
-});
-
 window.addTask = addTask;
 
 
 // Create task element with delete button
 
-function createTaskElement(text) {
+function createTaskElement(taskData) {
   const task = document.createElement("div");
   task.className = "task d-flex justify-content-between align-items-center";
   task.draggable = true;
 
+  task.dataset.id = taskData.id; // important
+
   const span = document.createElement("span");
-  span.textContent = text;
+  span.textContent = taskData.title;
 
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "✕";
   deleteBtn.className = "btn btn-sm btn-danger";
 
-  deleteBtn.onclick = () => {
+  deleteBtn.onclick = async () => {
     task.remove();
 
-    // OPTIONAL: delete from Supabase
-    // await supabase.from('tasks').delete().eq('id', taskId);
+    await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', task.dataset.id);
   };
 
   task.appendChild(span);
@@ -131,16 +139,22 @@ document.querySelectorAll(".add-btn").forEach(btn => {
 
 document.getElementById("saveTask").addEventListener("click", async () => {
   const title = document.getElementById("taskTitle").value;
-
   if (!title) return;
 
-  const task = createTaskElement(title);
-  currentColumn.appendChild(task);
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert([
+      { title: title, status: currentColumn.dataset.status }
+    ])
+    .select(); // 🔥 important
 
-  // ✅ Save to Supabase
-  await supabase.from('tasks').insert([
-    { title: title, status: currentColumn.dataset.status }
-  ]);
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  const task = createTaskElement(data[0]); // use real DB data
+  currentColumn.appendChild(task);
 
   document.getElementById("taskTitle").value = "";
 
