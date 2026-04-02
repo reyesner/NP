@@ -13,7 +13,7 @@ let draggedTask = null;
 
 async function loadTasks() {
   const { data, error } = await supabase
-    .from('tasks')
+    .from('Dataset Keys')
     .select('*');
 
   if (error) {
@@ -137,7 +137,7 @@ deleteBtn.onclick = async () => {
   task.remove();
 
   await supabase
-    .from('tasks')
+    .from('Dataset Keys')
     .delete()
     .eq('id', task.dataset.id);
 };
