@@ -8,6 +8,10 @@ section#DROP_DOWN {
   padding-top: 100px;
 }
 
+div {
+    color: black;
+}
+
 div.title {
   padding: 10px;
   color: rgb(255, 82, 82);
@@ -40,9 +44,9 @@ div.col {
 }
 
 .task {
-    background: rgb(143, 93, 93);
+    background: rgb(225, 238, 255);
     padding: 10px;
-    margin-top: 10px;
+    margin-top: 25px;
     margin-bottom: 10px;
     border-radius: 6px;
     cursor: grab;
@@ -101,6 +105,10 @@ button {
 .board::-webkit-scrollbar {
   display: none; /* hide scrollbar */
 }
+
+.high { border-left: 5px solid red; }
+.medium { border-left: 5px solid orange; }
+.low { border-left: 5px solid green; }
 
 /* Medium screens → 2 columns */
 @media (min-width: 768px) {

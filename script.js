@@ -9,7 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 let currentColumn = null;
 let draggedTask = null;
-
+let editingTaskId = null;
 
 async function loadTasks() {
   const { data, error } = await supabase
@@ -58,27 +58,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.getElementById("saveTask").addEventListener("click", async () => {
   const title = document.getElementById("taskTitle").value;
-  if (!title) return;
+  const priority = document.getElementById("taskPriority").value;
+  const dueDate = document.getElementById("taskDueDate").value;
+
+  if (!title.trim()) return;
 
   const { data, error } = await supabase
-    .from('tasks')
+    .from('Dataset Keys')
     .insert([
-      { title: title, status: currentColumn.dataset.status }
+      {
+        title: title,
+        status: currentColumn.dataset.status,
+        priority: priority,
+        due_date: dueDate
+      }
     ])
-    .select(); // important
+    .select();
 
   if (error) {
     console.error(error);
     return;
   }
 
-  const task = createTaskElement(data[0]); // use real DB data
+  const task = createTaskElement(data[0]);
   currentColumn.appendChild(task);
-
-  document.getElementById("taskTitle").value = "";
 
   bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
 });
+
 
 // Allow columns to receive tasks
 document.querySelectorAll(".column").forEach(col => {
@@ -118,36 +125,50 @@ function addDragEvents(task) {
 
 function createTaskElement(taskData) {
   const task = document.createElement("div");
-  task.className = "task d-flex justify-content-between align-items-center";
+  task.className = "task p-2";
   task.draggable = true;
 
-  task.dataset.id = taskData.id; // important
+  task.dataset.id = taskData.id;
 
-  const span = document.createElement("span");
-  span.textContent = taskData.title;
+  const title = document.createElement("div");
+  title.textContent = taskData.title;
+
+  const meta = document.createElement("small");
+  meta.className = "text-muted";
+
+  meta.textContent = `
+    ${taskData.priority || "No priority"} 
+    ${taskData.due_date ? "• Due: " + taskData.due_date : ""}
+  `;
 
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "✕";
-  deleteBtn.className = "btn btn-sm btn-danger";
+  deleteBtn.className = "btn btn-sm btn-danger float-end";
 
-deleteBtn.onclick = async () => {
-  const confirmDelete = confirm("Are you sure you want to delete this task?");
-  if (!confirmDelete) return;
+  deleteBtn.onclick = async () => {
+    const confirmDelete = confirm("Are you sure?");
+    if (!confirmDelete) return;
 
-  task.remove();
+    task.remove();
 
-  await supabase
-    .from('Dataset Keys')
-    .delete()
-    .eq('id', task.dataset.id);
-};
+    await supabase
+      .from('Dataset Keys')
+      .delete()
+      .eq('id', task.dataset.id);
+  };
 
-  task.appendChild(span);
   task.appendChild(deleteBtn);
+  task.appendChild(title);
+  task.appendChild(meta);
 
   addDragEvents(task);
   return task;
 }
+
+if (taskData.priority) {
+  task.classList.add(taskData.priority);
+}
+
 
 window.createTaskElement = createTaskElement;
 
