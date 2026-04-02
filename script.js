@@ -44,7 +44,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Add button
+
+  // ADD BUTTON 
+
+
   document.querySelectorAll(".add-btn").forEach(btn => {
   btn.addEventListener("click", function () {
     currentColumn = this.parentElement;
@@ -54,10 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// Element id 
+// ELEMENT ID (SAVE TASK)
 
 document.getElementById("saveTask").addEventListener("click", async () => {
   const title = document.getElementById("taskTitle").value;
+  const description = document.getElementById("taskDescription").value;
   const priority = document.getElementById("taskPriority").value;
   const dueDate = document.getElementById("taskDueDate").value;
 
@@ -70,7 +74,8 @@ document.getElementById("saveTask").addEventListener("click", async () => {
         title: title,
         status: currentColumn.dataset.status,
         priority: priority,
-        due_date: dueDate
+        due_date: dueDate,
+        description: description
       }
     ])
     .select();
@@ -83,7 +88,20 @@ document.getElementById("saveTask").addEventListener("click", async () => {
   const task = createTaskElement(data[0]);
   currentColumn.appendChild(task);
 
+  editingTaskId = null;
+
   bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
+});
+
+// ELEMENT ID (TASK MODAL)
+
+document.getElementById("taskModal").addEventListener("hidden.bs.modal", () => {
+  editingTaskId = null;
+
+  document.getElementById("taskTitle").value = "";
+  document.getElementById("taskDescription").value = "";
+  document.getElementById("taskPriority").value = "";
+  document.getElementById("taskDueDate").value = "";
 });
 
 
@@ -119,9 +137,8 @@ function addDragEvents(task) {
 }
 
 
+// Create task element with delete/edit button
 
-
-// Create task element with delete button
 
 function createTaskElement(taskData) {
   const task = document.createElement("div");
@@ -141,6 +158,29 @@ function createTaskElement(taskData) {
     ${taskData.due_date ? "• Due: " + taskData.due_date : ""}
   `;
 
+
+  // EDIT BUTTON LOGIC
+
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "✏️";
+  editBtn.className = "btn btn-sm btn-warning me-1";
+
+
+  editBtn.onclick = () => {
+    editingTaskId = task.dataset.id;
+
+    document.getElementById("taskTitle").value = taskData.title;
+    document.getElementById("taskDescription").value = taskData.description || "";
+    document.getElementById("taskPriority").value = taskData.priority || "";
+    document.getElementById("taskDueDate").value = taskData.due_date || "";
+
+    const modal = new bootstrap.Modal(document.getElementById('taskModal'));
+    modal.show();
+  };
+
+  // DELETE 
+
+
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "✕";
   deleteBtn.className = "btn btn-sm btn-danger float-end";
@@ -157,6 +197,8 @@ function createTaskElement(taskData) {
       .eq('id', task.dataset.id);
   };
 
+  // const btnContainer = document.createElement("div");
+  task.appendChild(editBtn);
   task.appendChild(deleteBtn);
   task.appendChild(title);
   task.appendChild(meta);
