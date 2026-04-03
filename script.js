@@ -5,7 +5,7 @@ const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-
+// GLOBAL VARIABLES
 
 let currentColumn = null;
 let draggedTask = null;
@@ -17,22 +17,35 @@ let board = null;
 // USER (CLIENT)
 
 async function initUser() {
+  
+  // CHECK FOR EXISTING USER
+
   const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  // LOG ANY ERROR FROM GETTING USER
 
   if (userError) {
     console.error("getUser error:", userError);
   }
 
+  // IF USER EXISTS, RETURN IT
+
   if (userData?.user) {
     return userData.user;
   }
 
+  // IF NO USER, SIGN IN ANONYMOUSLY
+
   const { data, error } = await supabase.auth.signInAnonymously();
+
+  // LOG ANY ERROR FROM ANONYMOUS SIGN-IN
 
   if (error) {
     console.error("Anonymous sign-in failed:", error);
     return null;
   }
+
+  // RETURN THE NEWLY SIGNED-IN USER
 
   return data?.user ?? null;
 }
@@ -40,29 +53,42 @@ async function initUser() {
 
 
 async function loadTasks() {
+
+  // CLEAR EXISTING TASKS FROM UI
+
     document.querySelectorAll(".column").forEach(col => {
     col.querySelectorAll(".task").forEach(task => task.remove());
   });
+
+  // CHECK FOR CURRENT USER
 
   if (!window.currentUser) {
     console.error("loadTasks: currentUser is missing");
     return;
   }
 
+  // FETCH TASKS FOR CURRENT USER
+
   const { data, error } = await supabase
     .from('Dataset Keys')
     .select('*')
     .eq('user_id', window.currentUser.id); //  FILTER
+
+  // LOG ANY ERROR FROM FETCHING TASKS
 
   if (error) {
     console.error(error);
     return;
   }
 
+  // APPEND TASKS TO CORRECT COLUMNS
+
   data.forEach(taskData => {
     const column = document.querySelector(
       `[data-status="${taskData.status}"]`
     );
+
+    // SAFEGUARD: CHECK IF COLUMN EXISTS BEFORE APPENDING
 
     if (column) {
       const taskEl = createTaskElement(taskData);
@@ -71,27 +97,40 @@ async function loadTasks() {
   });
 }
 
-
+// INITIALIZATION
 
 document.addEventListener('DOMContentLoaded', async  () => {
 
+  // INITIALIZE USER AND LOG RESULT
+
   const user = await initUser();
   console.log("initUser returned:", user);
+
+  // SAFEGUARD: CHECK IF USER WAS SUCCESSFULLY INITIALIZED BEFORE PROCEEDING
 
   if (!user) {
     console.error("No user available. App setup stopped.");
     return;
   }
 
+  // STORE CURRENT USER IN GLOBAL VARIABLE
+
   window.currentUser = user;
+
+  // SELECT BOARD ELEMENT
 
   board = document.querySelector(".board");
 
+  // LOG CURRENT USER ID FOR DEBUGGING
+
   console.log("Current user:", window.currentUser.id);
+
+  // LOAD TASKS FOR CURRENT USER
 
   await loadTasks();
 
-  // loadTasks();
+  // NESTED LIST TOGGLER LOGIC
+
   const toggler = document.getElementsByClassName('caret');
   for (let i = 0; i < toggler.length; i++) {
     toggler[i].addEventListener('click', function () {
@@ -101,7 +140,7 @@ document.addEventListener('DOMContentLoaded', async  () => {
   }
 
 
-  // ADD BUTTON 
+  // ADD BUTTON // 
 
 
   document.querySelectorAll(".add-btn").forEach(btn => {
@@ -113,12 +152,15 @@ document.addEventListener('DOMContentLoaded', async  () => {
   });
 });
 
+
 // DELETE BUTTON 
+
 
 document.getElementById("confirmDelete").addEventListener("click", async () => {
   if (!taskToDeleteId) return;
 
   // Remove from UI
+
   taskElementToDelete.remove();
 
   // Remove from Supabase
@@ -137,19 +179,59 @@ document.getElementById("confirmDelete").addEventListener("click", async () => {
 // ELEMENT ID (SAVE TASK)
 
 document.getElementById("saveTask").addEventListener("click", async () => {
+
+  // GET VALUES FROM FORM FIELDS
+
   const title = document.getElementById("taskTitle").value;
   const description = document.getElementById("taskDescription").value;
   const priority = document.getElementById("taskPriority").value;
   const dueDate = document.getElementById("taskDueDate").value;
+  const taskError = document.getElementById("taskError");
+  taskError.style.display = "none";
+  taskError.textContent = "";
 
-  if (!title.trim()) return;
+  // VALIDATION LOGIC
+  // REMOVE RED HIGHLIGHT FROM ALL FIELDS BEFORE CHECKING
+
+  document.getElementById("taskTitle").classList.remove("is-invalid");
+  document.getElementById("taskPriority").classList.remove("is-invalid");
+  document.getElementById("taskDueDate").classList.remove("is-invalid");
+
+  // CHECK IF REQUIRED FIELDS ARE MISSING
+
+  if (!title.trim() || !priority || !dueDate) {
+
+    // ADD RED HIGHLIGHT TO MISSING FIELDS
+
+    document.getElementById("taskTitle").classList.toggle("is-invalid", !title.trim());
+    document.getElementById("taskPriority").classList.toggle("is-invalid", !priority);
+    document.getElementById("taskDueDate").classList.toggle("is-invalid", !dueDate);
+
+    const missingFields = [];
+
+    // CHECK WHICH FIELDS ARE MISSING AND ADD TO ERROR MESSAGE
+
+    if (!title.trim()) missingFields.push("title");
+    if (!priority) missingFields.push("priority");
+    if (!dueDate) missingFields.push("due date");
+
+    taskError.textContent = `Please fill in: ${missingFields.join(", ")}.`;
+    taskError.style.display = "block";
+    return;
+  }
+
+  // SAFEGUARD: CHECK IF CURRENT USER EXISTS BEFORE SAVING
 
   if (!window.currentUser) {
     console.error("Cannot save task: currentUser is missing");
     return;
   }
 
+  // SAVE OR UPDATE TASK IN SUPABASE
+
   let data, error;
+
+  // IF EDITING, UPDATE EXISTING TASK; OTHERWISE, INSERT NEW TASK
 
   if (editingTaskId) {
     ({ data, error } = await supabase
@@ -177,12 +259,18 @@ document.getElementById("saveTask").addEventListener("click", async () => {
       .select());
   }
 
+  // LOG ANY ERROR FROM SAVING TASK
+
   if (error) {
     console.error("Save task error:", error);
     return;
   }
 
+  // RELOAD TASKS TO REFLECT CHANGES
+
   await loadTasks();
+
+  // RESET FORM AND STATE
 
   editingTaskId = null;
   bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
@@ -194,26 +282,39 @@ document.getElementById("saveTask").addEventListener("click", async () => {
 
 
 document.getElementById("taskModal").addEventListener("hidden.bs.modal", () => {
+
+  // RESET FORM FIELDS AND ERROR MESSAGES
+
   editingTaskId = null;
   currentColumn = null;
   document.getElementById("taskTitle").value = "";
   document.getElementById("taskDescription").value = "";
   document.getElementById("taskPriority").value = "";
   document.getElementById("taskDueDate").value = "";
+  document.getElementById("taskError").textContent = "";
+  document.getElementById("taskError").style.display = "none";
 });
+
 
 // EDIT FROM TASK DETAILS MODAL
 
+
 document.getElementById("editFromDetail").addEventListener("click", () => {
+
+  // CLOSE DETAILS MODAL
+
   const modalEl = document.getElementById('detailModal');
   const modal = bootstrap.Modal.getInstance(modalEl);
   modal.hide();
 
-  // Fill form with current values
+  // PREFILL EDIT FORM WITH CURRENT TASK DETAILS
+
   document.getElementById("taskTitle").value = document.getElementById("detailTitle").textContent;
   document.getElementById("taskDescription").value = document.getElementById("detailDescription").textContent;
   document.getElementById("taskPriority").value = document.getElementById("detailPriority").textContent.toLowerCase();
   document.getElementById("taskDueDate").value = document.getElementById("detailDueDate").textContent;
+
+  // OPEN EDIT MODAL
 
   const editModal = new bootstrap.Modal(document.getElementById('taskModal'));
   editModal.show();
@@ -222,29 +323,31 @@ document.getElementById("editFromDetail").addEventListener("click", () => {
 });
 
 
-//////////////////////////////////
-
-
 // Create task element with delete/edit button
 
 
 function createTaskElement(taskData) {
+
+  // CREATE TASK CONTAINER
+
   const task = document.createElement("div");
   task.className = "task p-2";
   task.draggable = false;
   task.dataset.id = taskData.id;
 
+  // APPLY PRIORITY CLASS FOR STYLING
+
 if (taskData.priority) {
   task.classList.add(taskData.priority);
 }
 
-  // DRAG BUTTON LOGIC
+  // DRAG HANDLE
   
   const dragHandle = document.createElement("div");
   dragHandle.className = "drag-handle";
   dragHandle.textContent = "⋮⋮";
 
-
+  // TASK TITLE AND META
 
   const title = document.createElement("div");
   title.textContent = taskData.title;
@@ -252,19 +355,23 @@ if (taskData.priority) {
   const meta = document.createElement("small");
   meta.className = "text-muted";
 
+  // COMBINE PRIORITY AND DUE DATE INTO META TEXT
+
   meta.textContent = `
     ${taskData.priority || "No priority"} 
     ${taskData.due_date ? "• Due: " + taskData.due_date : ""}
   `;
 
 
-  // EDIT BUTTON LOGIC
+  // EDIT BUTTON 
 
   const editBtn = document.createElement("button");
   editBtn.textContent = "✏️";
   editBtn.className = "btn btn-sm btn-warning me-1";
 
   editBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+
+  // OPEN EDIT MODAL AND PREFILL WITH TASK DATA
 
   editBtn.onclick = () => {
     editingTaskId = task.dataset.id;
@@ -278,7 +385,8 @@ if (taskData.priority) {
     modal.show();
   };
 
-  // DELETE BUTTON LOGIC
+
+  // DELETE BUTTON LOGIC & OPEN DELETE CONFIRMATION MODAL
 
 
   const deleteBtn = document.createElement("button");
@@ -296,8 +404,9 @@ if (taskData.priority) {
   modal.show();
 };
 
-
-  // DRAG DETAILS LOGIC 
+  // TASK DETAILS MODAL LOGIC
+  // OPEN DETAILS MODAL AND DISPLAY TASK INFO
+  // SAFEGUARD: PREVENT OPENING DETAILS MODAL IF CLICKED ON BUTTONS OR DRAG HANDLE
 
     task.onclick = (e) => {
     if (e.target.tagName === "BUTTON") return;
@@ -333,6 +442,9 @@ window.createTaskElement = createTaskElement;
 // POINTER DRAG 
 
 function addPointerDrag(task, handle) {
+
+  // GLOBAL VARIABLES FOR DRAGGING STATE AND POSITION
+
   let isDragging = false;
   let offsetX = 0;
   let offsetY = 0;
@@ -341,11 +453,15 @@ function addPointerDrag(task, handle) {
   let autoScrollFrame = null;
   let originalColumn = null;
 
+  // FUNCTION TO CLEAR DROP TARGET HIGHLIGHTS FROM ALL COLUMNS
+
   function clearHighlights() {
     document.querySelectorAll(".column").forEach(col => {
       col.classList.remove("drop-target");
     });
   }
+
+  // FUNCTION TO STOP AUTO SCROLLING WHEN DRAG ENDS
 
   function stopAutoScroll() {
     if (autoScrollFrame) {
@@ -354,27 +470,8 @@ function addPointerDrag(task, handle) {
     }
   }
 
-  // AUTO SCROLL LOGIC
+  // FUNCTION TO AUTO SCROLL BOARD WHEN DRAGGING NEAR EDGES
 
-//   function autoScroll() {
-//   if (!isDragging || !board) return;
-
-//   const boardRect = board.getBoundingClientRect();
-//   const edgeThreshold = 110;
-//   let scrollAmount = 0;
-
-//   if (currentClientX > boardRect.right - edgeThreshold) {
-//     scrollAmount = 18;
-//   } else if (currentClientX < boardRect.left + edgeThreshold) {
-//     scrollAmount = -18;
-//   }
-
-//   if (scrollAmount !== 0) {
-//     board.scrollLeft += scrollAmount;
-//   }
-
-//   autoScrollFrame = requestAnimationFrame(autoScroll);
-// }
   function autoScroll() {
     if (!isDragging || !board) return;
 
@@ -391,6 +488,8 @@ function addPointerDrag(task, handle) {
     autoScrollFrame = requestAnimationFrame(autoScroll);
   }
 
+  // FUNCTION TO RESET TASK STYLES AFTER DRAG ENDS
+
   function resetTaskStyles() {
     task.style.position = "";
     task.style.left = "";
@@ -399,6 +498,8 @@ function addPointerDrag(task, handle) {
     task.style.zIndex = "";
     task.style.pointerEvents = "";
   }
+
+  // POINTER DOWN EVENT TO START DRAGGING
 
   handle.addEventListener("pointerdown", (e) => {
     if (!board) return;
@@ -433,6 +534,8 @@ function addPointerDrag(task, handle) {
     autoScrollFrame = requestAnimationFrame(autoScroll);
   });
 
+  // POINTER MOVE EVENT TO UPDATE TASK POSITION AND HIGHLIGHT DROP TARGETS
+
   document.addEventListener("pointermove", (e) => {
     if (!isDragging || !board) return;
 
@@ -452,6 +555,8 @@ function addPointerDrag(task, handle) {
       column.classList.add("drop-target");
     }
   });
+
+  // POINTER UP EVENT TO DROP TASK INTO NEW COLUMN AND UPDATE STATUS IN SUPABASE
 
   document.addEventListener("pointerup", async (e) => {
     if (!isDragging) return;
@@ -481,6 +586,8 @@ function addPointerDrag(task, handle) {
       }
     }
   });
+
+  // POINTER CANCEL EVENT TO HANDLE INTERRUPTED DRAG (E.G. ESC KEY, SYSTEM INTERRUPT)
 
   document.addEventListener("pointercancel", () => {
     if (!isDragging) return;
