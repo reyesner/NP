@@ -13,14 +13,45 @@ let editingTaskId = null;
 let taskToDeleteId = null;
 let taskElementToDelete = null;
 
+// USER (CLIENT)
+
+async function initUser() {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error("getUser error:", userError);
+  }
+
+  if (userData?.user) {
+    return userData.user;
+  }
+
+  const { data, error } = await supabase.auth.signInAnonymously();
+
+  if (error) {
+    console.error("Anonymous sign-in failed:", error);
+    return null;
+  }
+
+  return data?.user ?? null;
+}
+
+
+
 async function loadTasks() {
     document.querySelectorAll(".column").forEach(col => {
     col.querySelectorAll(".task").forEach(task => task.remove());
   });
 
+  if (!window.currentUser) {
+    console.error("loadTasks: currentUser is missing");
+    return;
+  }
+
   const { data, error } = await supabase
     .from('Dataset Keys')
-    .select('*');
+    .select('*')
+    .eq('user_id', window.currentUser.id); //  FILTER
 
   if (error) {
     console.error(error);
@@ -40,8 +71,23 @@ async function loadTasks() {
 }
 
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadTasks();
+
+document.addEventListener('DOMContentLoaded', async  () => {
+
+  const user = await initUser();
+  console.log("initUser returned:", user);
+
+  if (!user) {
+    console.error("No user available. App setup stopped.");
+    return;
+  }
+
+  window.currentUser = user;
+  console.log("Current user:", window.currentUser.id);
+
+  await loadTasks();
+
+  // loadTasks();
   const toggler = document.getElementsByClassName('caret');
   for (let i = 0; i < toggler.length; i++) {
     toggler[i].addEventListener('click', function () {
@@ -94,10 +140,14 @@ document.getElementById("saveTask").addEventListener("click", async () => {
 
   if (!title.trim()) return;
 
+  if (!window.currentUser) {
+    console.error("Cannot save task: currentUser is missing");
+    return;
+  }
+
   let data, error;
 
   if (editingTaskId) {
-    // EDIT EXISTING TASK
     ({ data, error } = await supabase
       .from('Dataset Keys')
       .update({
@@ -107,10 +157,9 @@ document.getElementById("saveTask").addEventListener("click", async () => {
         due_date: dueDate
       })
       .eq('id', editingTaskId)
+      .eq('user_id', window.currentUser.id)
       .select());
-
   } else {
-    // CREATE NEW TASK
     ({ data, error } = await supabase
       .from('Dataset Keys')
       .insert([{
@@ -118,59 +167,27 @@ document.getElementById("saveTask").addEventListener("click", async () => {
         description,
         priority,
         due_date: dueDate,
-        status: currentColumn.dataset.status
+        status: currentColumn.dataset.status,
+        user_id: window.currentUser.id
       }])
       .select());
   }
 
   if (error) {
-    console.error(error);
+    console.error("Save task error:", error);
     return;
   }
 
-  // Reload UI 
-  loadTasks();
+  await loadTasks();
 
   editingTaskId = null;
-
   bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
 });
 
-// document.getElementById("saveTask").addEventListener("click", async () => {
-//   const title = document.getElementById("taskTitle").value;
-//   const description = document.getElementById("taskDescription").value;
-//   const priority = document.getElementById("taskPriority").value;
-//   const dueDate = document.getElementById("taskDueDate").value;
 
-//   if (!title.trim()) return;
-
-//   const { data, error } = await supabase
-//     .from('Dataset Keys')
-//     .insert([
-//       {
-//         title: title,
-//         status: currentColumn.dataset.status,
-//         priority: priority,
-//         due_date: dueDate,
-//         description: description
-//       }
-//     ])
-//     .select();
-
-//   if (error) {
-//     console.error(error);
-//     return;
-//   }
-
-//   const task = createTaskElement(data[0]);
-//   currentColumn.appendChild(task);
-
-//   editingTaskId = null;
-
-//   bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
-// });
 
 // ELEMENT ID (TASK MODAL)
+
 
 document.getElementById("taskModal").addEventListener("hidden.bs.modal", () => {
   editingTaskId = null;
@@ -225,27 +242,26 @@ document.getElementById("editFromDetail").addEventListener("click", () => {
 //////////////////////////////////
 
 
-// Add drag behavior to tasks
-function addDragEvents(task) {
-  task.addEventListener("dragstart", () => {
-    draggedTask = task;
-  });
-}
-
-
 // Create task element with delete/edit button
 
 
 function createTaskElement(taskData) {
   const task = document.createElement("div");
   task.className = "task p-2";
-  task.draggable = true;
-
+  task.draggable = false;
   task.dataset.id = taskData.id;
 
 if (taskData.priority) {
   task.classList.add(taskData.priority);
 }
+
+  // DRAG BUTTON LOGIC
+  
+  const dragHandle = document.createElement("div");
+  dragHandle.className = "drag-handle";
+  dragHandle.textContent = "⋮⋮";
+  task.appendChild(dragHandle);
+
 
 
   const title = document.createElement("div");
@@ -266,6 +282,7 @@ if (taskData.priority) {
   editBtn.textContent = "✏️";
   editBtn.className = "btn btn-sm btn-warning me-1";
 
+  editBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
 
   editBtn.onclick = () => {
     editingTaskId = task.dataset.id;
@@ -286,6 +303,8 @@ if (taskData.priority) {
   deleteBtn.textContent = "✕";
   deleteBtn.className = "btn btn-sm btn-danger float-end";
 
+  deleteBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+
 
   deleteBtn.onclick = () => {
   taskToDeleteId = task.dataset.id;
@@ -296,35 +315,129 @@ if (taskData.priority) {
 };
 
 
-  // TASK DETAIL ON OPEN LOGIC 
+  // DRAG DETAILS LOGIC 
 
-  task.onclick = (e) => {
-  // Prevent triggering when clicking buttons
-  if (e.target.tagName === "BUTTON") return;
+    task.onclick = (e) => {
+    if (e.target.tagName === "BUTTON") return;
+    if (e.target.closest(".drag-handle")) return;
 
-  document.getElementById("detailTitle").textContent = taskData.title;
-  document.getElementById("detailDescription").textContent = taskData.description || "No description";
-  document.getElementById("detailPriority").textContent = taskData.priority || "None";
-  document.getElementById("detailDueDate").textContent = taskData.due_date || "None";
+    document.getElementById("detailTitle").textContent = taskData.title;
+    document.getElementById("detailDescription").textContent = taskData.description || "No description";
+    document.getElementById("detailPriority").textContent = taskData.priority || "None";
+    document.getElementById("detailDueDate").textContent = taskData.due_date || "None";
 
-  // Store for editing
-  editingTaskId = taskData.id;
+    editingTaskId = taskData.id;
 
-  const modal = new bootstrap.Modal(document.getElementById('detailModal'));
-  modal.show();
-};
+    const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+    modal.show();
+  };
+//   task.onclick = (e) => {
+//   // Prevent triggering when clicking buttons
+//   if (e.target.tagName === "BUTTON") return;
 
-  // EDIT ON TASK DETAILS
+//   document.getElementById("detailTitle").textContent = taskData.title;
+//   document.getElementById("detailDescription").textContent = taskData.description || "No description";
+//   document.getElementById("detailPriority").textContent = taskData.priority || "None";
+//   document.getElementById("detailDueDate").textContent = taskData.due_date || "None";
 
+//   // Store for editing
+//   editingTaskId = taskData.id;
+
+//   const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+//   modal.show();
+// };
+
+  // APPENDS ELEMENTS TO TASK
+
+  task.appendChild(dragHandle);
   task.appendChild(editBtn);
   task.appendChild(deleteBtn);
   task.appendChild(title);
   task.appendChild(meta);
 
-  addDragEvents(task);
+  addPointerDrag(task, dragHandle)
   return task;
 }
 
 
 window.createTaskElement = createTaskElement;
+
+
+// POINTER DRAG 
+
+function addPointerDrag(task, handle) {
+  let offsetX = 0;
+  let offsetY = 0;
+  let isDragging = false;
+
+  handle.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+
+    isDragging = true;
+    document.body.style.overflow = "hidden";
+
+    const rect = task.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+
+    task.style.position = "absolute";
+    task.style.left = `${rect.left + window.scrollX}px`;
+    task.style.top = `${rect.top + window.scrollY}px`;
+    task.style.width = `${rect.width}px`;
+    task.style.zIndex = "1000";
+    task.style.pointerEvents = "none";
+  });
+
+  document.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+
+    task.style.left = `${e.clientX - offsetX + window.scrollX}px`;
+    task.style.top = `${e.clientY - offsetY + window.scrollY}px`;
+
+    const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+    const column = elementBelow?.closest(".column");
+
+    document.querySelectorAll(".column").forEach(col => {
+      col.classList.remove("drop-target");
+    });
+
+    if (column) {
+      column.classList.add("drop-target");
+    }
+  });
+
+  document.addEventListener("pointerup", async (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+
+    document.body.style.overflow = "";
+
+    const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+    const column = elementBelow?.closest(".column");
+
+    if (column) {
+      column.appendChild(task);
+
+      const { error } = await supabase
+        .from('Dataset Keys')
+        .update({ status: column.dataset.status })
+        .eq('id', task.dataset.id);
+
+      if (error) {
+        console.error("Drag update failed:", error);
+      }
+    }
+
+    task.style.position = "";
+    task.style.left = "";
+    task.style.top = "";
+    task.style.width = "";
+    task.style.zIndex = "";
+    task.style.pointerEvents = "";
+
+    document.querySelectorAll(".column").forEach(col => {
+      col.classList.remove("drop-target");
+    });
+  });
+}
 
