@@ -10,8 +10,14 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 let currentColumn = null;
 let draggedTask = null;
 let editingTaskId = null;
+let taskToDeleteId = null;
+let taskElementToDelete = null;
 
 async function loadTasks() {
+    document.querySelectorAll(".column").forEach(col => {
+    col.querySelectorAll(".task").forEach(task => task.remove());
+  });
+
   const { data, error } = await supabase
     .from('Dataset Keys')
     .select('*');
@@ -57,6 +63,27 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// DELETE BUTTON 
+
+document.getElementById("confirmDelete").addEventListener("click", async () => {
+  if (!taskToDeleteId) return;
+
+  // Remove from UI
+  taskElementToDelete.remove();
+
+  // Remove from Supabase
+  await supabase
+    .from('Dataset Keys')
+    .delete()
+    .eq('id', taskToDeleteId);
+
+  // Reset
+  taskToDeleteId = null;
+  taskElementToDelete = null;
+
+  bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+});
+
 // ELEMENT ID (SAVE TASK)
 
 document.getElementById("saveTask").addEventListener("click", async () => {
@@ -67,37 +94,87 @@ document.getElementById("saveTask").addEventListener("click", async () => {
 
   if (!title.trim()) return;
 
-  const { data, error } = await supabase
-    .from('Dataset Keys')
-    .insert([
-      {
-        title: title,
-        status: currentColumn.dataset.status,
-        priority: priority,
+  let data, error;
+
+  if (editingTaskId) {
+    // EDIT EXISTING TASK
+    ({ data, error } = await supabase
+      .from('Dataset Keys')
+      .update({
+        title,
+        description,
+        priority,
+        due_date: dueDate
+      })
+      .eq('id', editingTaskId)
+      .select());
+
+  } else {
+    // CREATE NEW TASK
+    ({ data, error } = await supabase
+      .from('Dataset Keys')
+      .insert([{
+        title,
+        description,
+        priority,
         due_date: dueDate,
-        description: description
-      }
-    ])
-    .select();
+        status: currentColumn.dataset.status
+      }])
+      .select());
+  }
 
   if (error) {
     console.error(error);
     return;
   }
 
-  const task = createTaskElement(data[0]);
-  currentColumn.appendChild(task);
+  // Reload UI 
+  loadTasks();
 
   editingTaskId = null;
 
   bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
 });
 
+// document.getElementById("saveTask").addEventListener("click", async () => {
+//   const title = document.getElementById("taskTitle").value;
+//   const description = document.getElementById("taskDescription").value;
+//   const priority = document.getElementById("taskPriority").value;
+//   const dueDate = document.getElementById("taskDueDate").value;
+
+//   if (!title.trim()) return;
+
+//   const { data, error } = await supabase
+//     .from('Dataset Keys')
+//     .insert([
+//       {
+//         title: title,
+//         status: currentColumn.dataset.status,
+//         priority: priority,
+//         due_date: dueDate,
+//         description: description
+//       }
+//     ])
+//     .select();
+
+//   if (error) {
+//     console.error(error);
+//     return;
+//   }
+
+//   const task = createTaskElement(data[0]);
+//   currentColumn.appendChild(task);
+
+//   editingTaskId = null;
+
+//   bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
+// });
+
 // ELEMENT ID (TASK MODAL)
 
 document.getElementById("taskModal").addEventListener("hidden.bs.modal", () => {
   editingTaskId = null;
-
+  currentColumn = null;
   document.getElementById("taskTitle").value = "";
   document.getElementById("taskDescription").value = "";
   document.getElementById("taskPriority").value = "";
@@ -105,7 +182,9 @@ document.getElementById("taskModal").addEventListener("hidden.bs.modal", () => {
 });
 
 
-// Allow columns to receive tasks
+// ALLOWS COLUMNS TO RECIEVE TASKS
+
+
 document.querySelectorAll(".column").forEach(col => {
   col.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -121,6 +200,23 @@ col.addEventListener("drop", async () => {
       .eq('id', draggedTask.dataset.id);
   }
 });
+});
+
+// EDIT FROM TASK DETAILS MODAL
+
+document.getElementById("editFromDetail").addEventListener("click", () => {
+  const modalEl = document.getElementById('detailModal');
+  const modal = bootstrap.Modal.getInstance(modalEl);
+  modal.hide();
+
+  // Fill form with current values
+  document.getElementById("taskTitle").value = document.getElementById("detailTitle").textContent;
+  document.getElementById("taskDescription").value = document.getElementById("detailDescription").textContent;
+  document.getElementById("taskPriority").value = document.getElementById("detailPriority").textContent.toLowerCase();
+  document.getElementById("taskDueDate").value = document.getElementById("detailDueDate").textContent;
+
+  const editModal = new bootstrap.Modal(document.getElementById('taskModal'));
+  editModal.show();
 });
 
 });
@@ -146,6 +242,11 @@ function createTaskElement(taskData) {
   task.draggable = true;
 
   task.dataset.id = taskData.id;
+
+if (taskData.priority) {
+  task.classList.add(taskData.priority);
+}
+
 
   const title = document.createElement("div");
   title.textContent = taskData.title;
@@ -178,26 +279,43 @@ function createTaskElement(taskData) {
     modal.show();
   };
 
-  // DELETE 
+  // DELETE BUTTON LOGIC
 
 
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "✕";
   deleteBtn.className = "btn btn-sm btn-danger float-end";
 
-  deleteBtn.onclick = async () => {
-    const confirmDelete = confirm("Are you sure?");
-    if (!confirmDelete) return;
 
-    task.remove();
+  deleteBtn.onclick = () => {
+  taskToDeleteId = task.dataset.id;
+  taskElementToDelete = task;
 
-    await supabase
-      .from('Dataset Keys')
-      .delete()
-      .eq('id', task.dataset.id);
-  };
+  const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+  modal.show();
+};
 
-  // const btnContainer = document.createElement("div");
+
+  // TASK DETAIL ON OPEN LOGIC 
+
+  task.onclick = (e) => {
+  // Prevent triggering when clicking buttons
+  if (e.target.tagName === "BUTTON") return;
+
+  document.getElementById("detailTitle").textContent = taskData.title;
+  document.getElementById("detailDescription").textContent = taskData.description || "No description";
+  document.getElementById("detailPriority").textContent = taskData.priority || "None";
+  document.getElementById("detailDueDate").textContent = taskData.due_date || "None";
+
+  // Store for editing
+  editingTaskId = taskData.id;
+
+  const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+  modal.show();
+};
+
+  // EDIT ON TASK DETAILS
+
   task.appendChild(editBtn);
   task.appendChild(deleteBtn);
   task.appendChild(title);
@@ -205,10 +323,6 @@ function createTaskElement(taskData) {
 
   addDragEvents(task);
   return task;
-}
-
-if (taskData.priority) {
-  task.classList.add(taskData.priority);
 }
 
 

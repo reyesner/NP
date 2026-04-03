@@ -51,7 +51,7 @@
         </div>
         </div>
     </section>
-    <section class="test">
+    <section class="MODALS_CREATE">
 <div class="modal fade" id="taskModal">
   <div class="modal-dialog">
     <div class="modal-content p-3">
@@ -79,6 +79,47 @@
   </div>
 </div>
     </section>
+    <section class="MODALS_DELETE">
+      <div class="modal fade" id="deleteModal">
+        <div class="modal-dialog">
+        <div class="modal-content p-3">
+          
+          <h5>Delete Task</h5>
+          <p>Are you sure you want to delete this task?</p>
+
+          <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-danger" id="confirmDelete">Delete</button>
+          </div>
+
+      </div>
+      </div>
+    </div>
+    </section>
+
+    <section class="MODEL_DETAIL">
+      <div class="modal fade" id="detailModal">
+  <div class="modal-dialog">
+    <div class="modal-content p-3">
+      <h3 id="detailTitle"></h3>
+
+      <h5>Description</h5>
+      <p id="detailDescription"></p>
+
+      <p><strong>Priority:</strong> <span id="detailPriority"></span></p>
+      <p><strong>Due Date:</strong> <span id="detailDueDate"></span></p>
+
+      <div class="d-flex justify-content-end gap-2">
+        <button class="btn btn-warning" id="editFromDetail">Edit</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+    </section>
+  </body>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="script.js"></script>
 </html>
