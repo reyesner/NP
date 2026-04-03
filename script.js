@@ -12,6 +12,7 @@ let draggedTask = null;
 let editingTaskId = null;
 let taskToDeleteId = null;
 let taskElementToDelete = null;
+let board = null;
 
 // USER (CLIENT)
 
@@ -83,6 +84,9 @@ document.addEventListener('DOMContentLoaded', async  () => {
   }
 
   window.currentUser = user;
+
+  board = document.querySelector(".board");
+
   console.log("Current user:", window.currentUser.id);
 
   await loadTasks();
@@ -198,27 +202,6 @@ document.getElementById("taskModal").addEventListener("hidden.bs.modal", () => {
   document.getElementById("taskDueDate").value = "";
 });
 
-
-// ALLOWS COLUMNS TO RECIEVE TASKS
-
-
-document.querySelectorAll(".column").forEach(col => {
-  col.addEventListener("dragover", (e) => {
-    e.preventDefault();
-  });
-
-col.addEventListener("drop", async () => {
-  if (draggedTask) {
-    col.appendChild(draggedTask);
-
-    await supabase
-      .from('Dataset Keys')
-      .update({ status: col.dataset.status })
-      .eq('id', draggedTask.dataset.id);
-  }
-});
-});
-
 // EDIT FROM TASK DETAILS MODAL
 
 document.getElementById("editFromDetail").addEventListener("click", () => {
@@ -260,7 +243,6 @@ if (taskData.priority) {
   const dragHandle = document.createElement("div");
   dragHandle.className = "drag-handle";
   dragHandle.textContent = "⋮⋮";
-  task.appendChild(dragHandle);
 
 
 
@@ -331,21 +313,6 @@ if (taskData.priority) {
     const modal = new bootstrap.Modal(document.getElementById('detailModal'));
     modal.show();
   };
-//   task.onclick = (e) => {
-//   // Prevent triggering when clicking buttons
-//   if (e.target.tagName === "BUTTON") return;
-
-//   document.getElementById("detailTitle").textContent = taskData.title;
-//   document.getElementById("detailDescription").textContent = taskData.description || "No description";
-//   document.getElementById("detailPriority").textContent = taskData.priority || "None";
-//   document.getElementById("detailDueDate").textContent = taskData.due_date || "None";
-
-//   // Store for editing
-//   editingTaskId = taskData.id;
-
-//   const modal = new bootstrap.Modal(document.getElementById('detailModal'));
-//   modal.show();
-// };
 
   // APPENDS ELEMENTS TO TASK
 
@@ -366,40 +333,120 @@ window.createTaskElement = createTaskElement;
 // POINTER DRAG 
 
 function addPointerDrag(task, handle) {
+  let isDragging = false;
   let offsetX = 0;
   let offsetY = 0;
-  let isDragging = false;
+  let startBoardScrollLeft = 0;
+  let currentClientX = 0;
+  let autoScrollFrame = null;
+  let originalColumn = null;
+
+  function clearHighlights() {
+    document.querySelectorAll(".column").forEach(col => {
+      col.classList.remove("drop-target");
+    });
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollFrame) {
+      cancelAnimationFrame(autoScrollFrame);
+      autoScrollFrame = null;
+    }
+  }
+
+  // AUTO SCROLL LOGIC
+
+//   function autoScroll() {
+//   if (!isDragging || !board) return;
+
+//   const boardRect = board.getBoundingClientRect();
+//   const edgeThreshold = 110;
+//   let scrollAmount = 0;
+
+//   if (currentClientX > boardRect.right - edgeThreshold) {
+//     scrollAmount = 18;
+//   } else if (currentClientX < boardRect.left + edgeThreshold) {
+//     scrollAmount = -18;
+//   }
+
+//   if (scrollAmount !== 0) {
+//     board.scrollLeft += scrollAmount;
+//   }
+
+//   autoScrollFrame = requestAnimationFrame(autoScroll);
+// }
+  function autoScroll() {
+    if (!isDragging || !board) return;
+
+    const boardRect = board.getBoundingClientRect();
+    const edgeThreshold = 70;
+    const scrollSpeed = 14;
+
+    if (currentClientX > boardRect.right - edgeThreshold) {
+      board.scrollLeft += scrollSpeed;
+    } else if (currentClientX < boardRect.left + edgeThreshold) {
+      board.scrollLeft -= scrollSpeed;
+    }
+
+    autoScrollFrame = requestAnimationFrame(autoScroll);
+  }
+
+  function resetTaskStyles() {
+    task.style.position = "";
+    task.style.left = "";
+    task.style.top = "";
+    task.style.width = "";
+    task.style.zIndex = "";
+    task.style.pointerEvents = "";
+  }
 
   handle.addEventListener("pointerdown", (e) => {
+    if (!board) return;
+
+    e.preventDefault();
     e.stopPropagation();
 
     isDragging = true;
-    document.body.style.overflow = "hidden";
+    currentClientX = e.clientX;
+    startBoardScrollLeft = board.scrollLeft;
+    originalColumn = task.closest(".column");
+
+    document.body.style.overflowY = "hidden";
+    board.style.scrollBehavior = "auto";
 
     const rect = task.getBoundingClientRect();
     offsetX = e.clientX - rect.left;
     offsetY = e.clientY - rect.top;
 
-    task.style.position = "absolute";
-    task.style.left = `${rect.left + window.scrollX}px`;
-    task.style.top = `${rect.top + window.scrollY}px`;
+    task.style.position = "fixed";
+    task.style.left = `${rect.left}px`;
+    task.style.top = `${rect.top}px`;
     task.style.width = `${rect.width}px`;
     task.style.zIndex = "1000";
     task.style.pointerEvents = "none";
+
+    if (handle.setPointerCapture) {
+      handle.setPointerCapture(e.pointerId);
+    }
+
+    stopAutoScroll();
+    autoScrollFrame = requestAnimationFrame(autoScroll);
   });
 
   document.addEventListener("pointermove", (e) => {
-    if (!isDragging) return;
+    if (!isDragging || !board) return;
 
-    task.style.left = `${e.clientX - offsetX + window.scrollX}px`;
-    task.style.top = `${e.clientY - offsetY + window.scrollY}px`;
+    currentClientX = e.clientX;
+
+    const boardScrollDelta = board.scrollLeft - startBoardScrollLeft;
+
+    task.style.left = `${e.clientX - offsetX - boardScrollDelta}px`;
+    task.style.top = `${e.clientY - offsetY}px`;
 
     const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
     const column = elementBelow?.closest(".column");
 
-    document.querySelectorAll(".column").forEach(col => {
-      col.classList.remove("drop-target");
-    });
+    clearHighlights();
 
     if (column) {
       column.classList.add("drop-target");
@@ -410,10 +457,15 @@ function addPointerDrag(task, handle) {
     if (!isDragging) return;
     isDragging = false;
 
-    document.body.style.overflow = "";
+    stopAutoScroll();
+    document.body.style.overflowY = "";
+    board.style.scrollBehavior = "";
 
     const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
-    const column = elementBelow?.closest(".column");
+    const column = elementBelow?.closest(".column") || originalColumn;
+
+    clearHighlights();
+    resetTaskStyles();
 
     if (column) {
       column.appendChild(task);
@@ -421,23 +473,28 @@ function addPointerDrag(task, handle) {
       const { error } = await supabase
         .from('Dataset Keys')
         .update({ status: column.dataset.status })
-        .eq('id', task.dataset.id);
+        .eq('id', task.dataset.id)
+        .eq('user_id', window.currentUser.id);
 
       if (error) {
         console.error("Drag update failed:", error);
       }
     }
+  });
 
-    task.style.position = "";
-    task.style.left = "";
-    task.style.top = "";
-    task.style.width = "";
-    task.style.zIndex = "";
-    task.style.pointerEvents = "";
+  document.addEventListener("pointercancel", () => {
+    if (!isDragging) return;
+    isDragging = false;
 
-    document.querySelectorAll(".column").forEach(col => {
-      col.classList.remove("drop-target");
-    });
+    stopAutoScroll();
+    document.body.style.overflowY = "";
+    board.style.scrollBehavior = "";
+
+    clearHighlights();
+    resetTaskStyles();
+
+    if (originalColumn) {
+      originalColumn.appendChild(task);
+    }
   });
 }
-

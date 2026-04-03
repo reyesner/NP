@@ -26,33 +26,35 @@ div.col {
 
 
 .board {
-    display: flex;
-    gap: 40px; /* space BETWEEN columns */
-    scroll-snap-type: x mandatory;
-    overflow-x: auto;
-    scroll-behavior: smooth;
+  display: flex;
+  gap: 40px;
+  overflow-x: auto;
+  /* scroll-behavior: smooth; */
+  scroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+  /* scroll-snap-type: x proximity; */
+  scroll-snap-type: none;
 }
 
 .column {
-    flex: 0 0 100%;
-    background: #a7d3ff;
-    border-radius: 10px;
-    padding: 15px;
-    min-height: 400px;
-    max-width: 100%;
-    scroll-snap-align: start;
-    transition: background 0.2s ease;
+  flex: 0 0 100%;
+  max-width: 100%;
+  background: #a7d3ff;
+  border-radius: 10px;
+  padding: 15px;
+  min-height: 400px;
+  scroll-snap-align: start;
+  transition: background 0.2s ease;
 }
 
 .task {
-    background: rgb(225, 238, 255);
-    padding: 10px;
-    margin-top: 25px;
-    margin-bottom: 10px;
-    border-radius: 6px;
-    touch-action: none; /* KEY for mobile */
-    transition: transform 0.1s ease;
-    cursor: grab;
+  background: rgb(225, 238, 255);
+  padding: 10px;
+  margin-top: 25px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  transition: transform 0.1s ease;
+    
 }
 
 h5 {
@@ -120,6 +122,8 @@ button {
 .drag-handle {
   cursor: grab;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
   font-size: 18px;
   line-height: 1;
   width: fit-content;
