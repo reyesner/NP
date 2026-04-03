@@ -8,7 +8,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // GLOBAL VARIABLES
 
 let currentColumn = null;
-let draggedTask = null;
 let editingTaskId = null;
 let taskToDeleteId = null;
 let taskElementToDelete = null;
